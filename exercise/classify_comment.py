@@ -15,8 +15,9 @@ def create_lexicon(pos_file,neg_file):
             lex = []
             lines = f.readlines()
 
-def main():
 
+def main():
+    pass
 
 
 if __name__ == "__main__":
