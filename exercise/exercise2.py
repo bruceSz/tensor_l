@@ -6,10 +6,8 @@ import tensorflow as tf
 
 import pickle
 import numpy as np
-import pandas as pd
 import common
 
-from collections import OrderedDict
 
 org_train_file = "../data/trainingandtestdata/training.1600000.processed.noemoticon.csv"
 org_test_file = "../data/trainingandtestdata/testdata.manual.2009.06.14.csv"
@@ -68,7 +66,7 @@ def neural_network_cnn(X,dropout_keep_prob,num_classes,input_size):
             pooled_outputs.append(pooled)
 
     num_filters_total = num_filters*len(filter_sizes)
-    h_pool = tf.concat(3,pooled_outputs)
+    h_pool = tf.concat(pooled_outputs,3)
     h_pool_flat = tf.reshape(h_pool,[-1,num_filters_total])
 
     with tf.name_scope("dropout"):
@@ -88,19 +86,18 @@ def train_with_cnn():
         lex = pickle.load(lex_f)
 
     test_x,test_y = common.get_test_dataset(o_testing_file,lex)
+    print("type: %s"%type(test_x))
     input_size = len(lex)
     num_classes = 3
     X = tf.placeholder(tf.int32,[None,input_size])
     Y = tf.placeholder(tf.float32,[None,num_classes])
     dropout_keep_prob = tf.placeholder(tf.float32)
-
     batch_size = 90
-
 
     output = neural_network_cnn(X,dropout_keep_prob=dropout_keep_prob,
                                 num_classes=num_classes,input_size=input_size)
     optimizer = tf.train.AdamOptimizer(1e-3)
-    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(output,Y))
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=output,labels=Y))
     grads_and_vars = optimizer.compute_gradients(loss)
     train_op = optimizer.apply_gradients(grads_and_vars)
     saver = tf.train.Saver(tf.global_variables())
@@ -112,6 +109,7 @@ def train_with_cnn():
             batch_x = []
             batch_y = []
             try:
+                print("type of o_training_file: %s"%o_training_file)
                 lines = common.get_n_random_line(o_training_file, batch_size)
                 for line in lines:
                     label = line.split(":%:%:%:")[0]
@@ -127,6 +125,7 @@ def train_with_cnn():
                 _,loss_ = sess.run([train_op,loss],feed_dict={X:batch_x,Y:batch_y,dropout_keep_prob:0.5})
                 print(loss_)
             except Exception as e:
+                raise RuntimeError("xxxx")
                 print(e)
             if i %10 ==0:
                 predictions = tf.argmax(output,1)
@@ -135,9 +134,6 @@ def train_with_cnn():
                 accur = sess.run(accuracy,feed_dict={X:test_x[0:50],Y:test_y[0:50],dropout_keep_prob:1.0})
                 print("准确率:",accur)
             i+=1
-
-
-
 
 
 
@@ -155,11 +151,11 @@ def train():
     Y = tf.placeholder('float')
     batch_size = 90
     predict = neural_2_layer_network(X,n_input_layer,n_layer_1,n_layer_2,n_output_layer)
-    cost_func = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(predict,Y))
+    cost_func = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=predict,labels=Y))
     optimizer = tf.train.AdamOptimizer().minimize(cost_func)
 
     with tf.Session() as s:
-        s.run(tf.initialize_all_variables())
+        s.run(tf.global_variables_initializer())
         lemmatizer = WordNetLemmatizer()
         saver = tf.train.Saver()
         i = 0
@@ -190,7 +186,7 @@ def train():
                 if accuracy > pre_accuracy:
                     print("准确率", accuracy)
                     pre_accuracy = accuracy
-                    saver.save(s, 'model.ckpt')
+                    saver.save(s, '../data/model.ckpt')
                 i = 0
             i+= 1
 
@@ -199,7 +195,7 @@ def test_predict(tweet,lex):
     predict = neural_2_layer_network(X)
 
     with tf.Session() as s:
-        s.run(tf.initialize_all_variables())
+        s.run(tf.global_variables_initializer())
         saver = tf.train.Saver()
         saver.restore(s,'model.ckpt')
 
@@ -217,8 +213,8 @@ def test_predict(tweet,lex):
 
 def main():
     #preprocess()
-    #train()
-    train_with_cnn()
+    train()
+    #train_with_cnn()
 
 
 

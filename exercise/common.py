@@ -8,6 +8,8 @@ from collections import Counter
 
 from collections import OrderedDict
 
+import os
+
 import sys
 print(sys.path)
 
@@ -87,7 +89,7 @@ def get_random_line(f,point):
 def get_n_random_line(f_path, n=150):
     lines = []
     file = open(f_path, encoding='latin-1')
-    total_bytes = os.stat(file).st_size
+    total_bytes = os.stat(f_path).st_size
     for i in range(n):
         random_p = random.randint(0,total_bytes)
         lines.append(get_random_line(file,random_p))
