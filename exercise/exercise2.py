@@ -9,6 +9,8 @@ import numpy as np
 import common
 
 
+# 参考： https://zhuanlan.zhihu.com/p/28087321
+
 org_train_file = "../data/trainingandtestdata/training.1600000.processed.noemoticon.csv"
 org_test_file = "../data/trainingandtestdata/testdata.manual.2009.06.14.csv"
 
