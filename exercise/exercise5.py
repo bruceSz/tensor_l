@@ -73,7 +73,7 @@ class Game(object):
             if self.bar_pos.top <= self.ball_pos.bottom and (
                     self.bar_pos.left < self.ball_pos.right and self.bar_pos.right > self.ball_pos.left):
                 self.score += 1
-                print("Score: ", self.score, end='\r')
+                print("Score: ", self.score)
             elif self.bar_pos.top <= self.ball_pos.bottom and (
                     self.bar_pos.left > self.ball_pos.right or self.bar_pos.right < self.ball_pos.left):
                 print("Game Over: ", self.score)
@@ -84,11 +84,11 @@ class Game(object):
 
 from collections import deque
 import tensorflow as tf
-import cv2
+#import cv2
 
 
 class GameWithCNN(object):
-
+    pass
 
 def main():
     game = Game()
