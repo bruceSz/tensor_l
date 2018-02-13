@@ -18,14 +18,7 @@ def encoder_tw_nn(X):
     e_b_2 = tf.Variable(tf.constant(0.0, shape=[128]))
     e_w_3 = tf.Variable(tf.truncated_normal([128, 64], stddev=0.1))
     e_b_3 = tf.Variable(tf.constant(0.0, shape=[64]))
-    encoder_params = {
-        'ew1':e_w_1,
-        'eb1':e_b_1,
-        'ew2':e_w_2,
-        'eb2':e_b_2,
-        'ew3':e_w_3,
-        'eb3':e_b_3
-    }
+
 
     # decoder
     # tied weight.
@@ -43,7 +36,25 @@ def encoder_tw_nn(X):
     layer_4 = tf.nn.tanh(tf.add(tf.matmul(encoded, d_w_1), d_b_1))
     layer_5 = tf.nn.tanh(tf.add(tf.matmul(layer_4, d_w_2), d_b_2))
     decoded = tf.nn.tanh(tf.add(tf.matmul(layer_5, d_w_3), d_b_3))
-
+    encoder_params =  []
+    encoder_params.append({
+        'e_w':e_w_1,
+        'e_b':e_b_1,
+        'd_w':d_w_3,
+        'd_b':d_b_3
+    })
+    encoder_params.append({
+        'e_w': e_w_2,
+        'e_b': e_b_2,
+        'd_w': d_w_2,
+        'd_b': d_b_2
+    })
+    encoder_params.append({
+        'e_w': e_w_3,
+        'e_b': e_b_3,
+        'd_w': d_w_1,
+        'd_b': d_b_1
+    })
     return encoded,decoded,encoder_params
 
 
@@ -77,6 +88,125 @@ def load_train_test():
     test_y = np.asarray(pd.get_dummies(test_y))
     return train_x,train_y,test_x,test_y
 
+def train_a_tied_encoder(X,train_x, training_epochs,batch_size,total_batches):
+    enc, dec, enc_params = encoder_tw_nn(X)
+    enc_params_vals = []
+    encoder_cost = tf.reduce_mean(tf.pow(X - dec, 2))
+    encoder_opt = tf.train.GradientDescentOptimizer(learning_rate=0.01).minimize(encoder_cost)
+    # with tf.Session() as s:
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+
+        for epoch in range(training_epochs):
+            epoch_costs = np.empty(0)
+            for b in range(total_batches):
+                offset = b * batch_size
+                batch_x = train_x[offset:offset + batch_size, :]
+                _, c = sess.run([encoder_opt, encoder_cost], feed_dict={X: batch_x})
+                epoch_costs = np.append(epoch_costs, c)
+        print("Epoch ", epoch, '  Cost: ', np.mean(epoch_costs))
+
+        for para in enc_params:
+            tmp_dd = {}
+            for k,v in para:
+                tmp_dd[k]  = sess.run(v)
+            enc_params_vals.append(tmp_dd)
+            #if k == 'ew1':
+            #    print("After train para :", k, sess.run(v))
+            #enc_params_vals[k] = sess.run(v)
+    return enc_params_vals
+
+
+def gen_1level_autoencoder(X,fixed_params,in_size, enc_size,enc_w_n='e_w',enc_b_n='e_b',dec_w_n='d_w',dec_b_n='d_b'):
+    enc_pas = []
+    dec_pas = []
+    for param in fixed_params:
+        enc_pas.append((param['e_w'],param['e_b']))
+        dec_pas.insert(0,(param['d_w'],param['d_b']))
+    # --------------------- Encoder -------------------- #
+
+    layer = None
+    for enc_p in enc_pas:
+        e_w = enc_p[0]
+        e_b = enc_p[1]
+        if layer is None:
+            layer = tf.tanh(tf.add(tf.matmul(X,e_w),e_b))
+        else:
+            layer = tf.tanh(tf.add(tf.matmul(layer,e_w),e_b))
+
+    e_w = tf.Variable(tf.truncated_normal([in_size, enc_size], stddev=0.1))
+    e_b = tf.Variable(tf.constant(0.0, shape=[enc_size]))
+
+    if layer is None:
+        layer = tf.tanh(tf.add(tf.matmul(X, e_w), e_b))
+    else:
+        layer = tf.tanh(tf.add(tf.matmul(layer, e_w), e_b))
+
+    enc = layer
+
+    # --------------------- Dencoder -------------------- #
+    d_w_here = tf.Variable(tf.truncated_normal([enc_size, in_size], stddev=0.1))
+    d_b_here = tf.Variable(tf.constant(0.0, shape=[in_size]))
+
+    layer = tf.tanh(tf.add(tf.matmul(layer,d_w_here),d_b_here))
+    for dec_p in dec_pas:
+        d_w = dec_p[0]
+        d_b = dec_p[1]
+        layer = tf.tanh(tf.add(tf.matmul(layer, d_w), d_b))
+
+    dec = layer
+    #encoded = tf.tanh(tf.add(tf.matmul(X,e_w_1),e_b_1))
+    #out = tf.tanh(tf.add(tf.matmul(encoded,d_w_1),d_b_1))
+    ret = {
+        enc_w_n:e_w,
+        enc_b_n:e_b,
+        dec_w_n:d_w_here,
+        dec_b_n:d_b_here
+    }
+    encoder_cost = tf.reduce_mean(tf.pow(X - dec, 2))
+    encoder_opt = tf.train.GradientDescentOptimizer(learning_rate=0.01).minimize(encoder_cost)
+    return encoder_opt,encoder_cost,ret
+
+
+def train_autoenc(opt,cost,X ,train_x, t_epochs, b_size, t_batches,enc_params):
+    enc_params_vals = {}
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        for epoch in range(t_epochs):
+            epoch_costs = np.empty(0)
+            for b in range(t_batches):
+                offset = b * b_size
+                batch_x = train_x[offset:offset + b_size, :]
+                _, c = sess.run([opt, cost], feed_dict={X: batch_x})
+                epoch_costs = np.append(epoch_costs, c)
+        print("Epoch ", epoch, '  Cost: ', np.mean(epoch_costs))
+
+        for k, v in enc_params.items():
+            enc_params_vals[k] = sess.run(v)
+    return enc_params_vals
+
+
+def train_a_lbl_encoder(X,train_x,t_epochs,b_size,t_batches):
+    opt,cost,enc_params = gen_1level_autoencoder(X,[],in_size=520, enc_size=256)
+    params1 = train_autoenc(opt,cost,X,train_x,t_epochs,b_size,t_batches,enc_params)
+    opt,cost,enc_params = gen_1level_autoencoder(X,[params1],in_size=256,enc_size=128)
+    params2 = train_autoenc(opt,cost,X,train_x,t_epochs,b_size,t_batches,enc_params)
+    opt, cost, enc_params = gen_1level_autoencoder(X, [params1,params2], in_size=128, enc_size=64)
+    params3 = train_autoenc(opt,cost,X,train_x,t_epochs,b_size,t_batches,enc_params)
+
+    return [params1,params2,params3]
+
+
+
+_TIED = False
+def train_a_encoder(X,train_x, training_epochs,batch_size,total_batches):
+
+    if _TIED:
+        enc_params_vals =  train_a_tied_encoder(X,train_x, training_epochs,batch_size,total_batches)
+    else:
+        enc_params_vals = train_a_lbl_encoder(X,train_x, training_epochs,batch_size,total_batches)
+    return enc_params_vals
+
 
 def tied_weight_enc_dnn():
     print("Enter train tied weight enc")
@@ -84,37 +214,13 @@ def tied_weight_enc_dnn():
     n_output = train_y.shape[1]
     X = tf.placeholder(tf.float32, shape=[None, 520])
     Y = tf.placeholder(tf.float32, [None, n_output])
-    enc,dec,enc_params = encoder_tw_nn(X)
-    enc_params_vals = {}
-
-    encoder_cost = tf.reduce_mean(tf.pow(X - dec, 2))
-    encoder_opt = tf.train.GradientDescentOptimizer(learning_rate=0.01).minimize(encoder_cost)
 
     training_epochs = 20
     batch_size = 10
     total_batches = int(train_x.shape[0] / batch_size) + 1
-    #with tf.Session() as s:
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        for k,v in enc_params.items():
-            if k == 'ew1':
-                print("Before train para :", k,sess.run(v))
-        for epoch in range(training_epochs):
-            epoch_costs = np.empty(0)
-            for b in range(total_batches):
-                offset = b*batch_size
-                batch_x = train_x[offset:offset+batch_size,:]
-                _,c = sess.run([encoder_opt,encoder_cost],feed_dict={X:batch_x})
-                epoch_costs = np.append(epoch_costs,c)
-        print("Epoch ",epoch,'  Cost: ',np.mean(epoch_costs))
-
-        for k,v in enc_params.items():
-            if k == 'ew1':
-                print("After train para :", k,sess.run(v))
-            enc_params_vals[k] = sess.run(v)
+    enc_params_vals = train_a_encoder(X,train_x,training_epochs,batch_size,total_batches)
 
     output = dnn_with_enc(enc_params_vals,X,n_output)
-
     out_cost = tf.nn.softmax_cross_entropy_with_logits(labels=Y,logits=output)
     out_opt = tf.train.GradientDescentOptimizer(learning_rate=0.01).minimize(out_cost)
     correct = tf.equal(tf.argmax(Y,1),tf.argmax(output,1))
@@ -140,17 +246,26 @@ def tied_weight_enc_dnn():
 
 def dnn_with_enc(enc_pramas,X,n_output):
 
+    layer = None
+    for para in enc_pramas:
+        e_w = tf.constant(para['e_w'])
+        e_b = tf.constant(para['e_b'])
 
-    e_w_1 = tf.constant(enc_pramas['ew1'])
-    e_b_1 = tf.constant(enc_pramas['eb1'])
-    e_w_2 = tf.constant(enc_pramas['ew2'])
-    e_b_2 = tf.constant(enc_pramas['eb2'])
-    e_w_3 = tf.constant(enc_pramas['ew3'])
-    e_b_3 = tf.constant(enc_pramas['eb3'])
+        if layer is None:
+            layer = tf.tanh(tf.add(tf.matmul(X,e_w),e_b))
+        else:
+            layer = tf.tanh(tf.add(tf.matmul(layer,e_w),e_b))
+    #e_w_1 = tf.constant(enc_pramas['ew1'])
+    #e_b_1 = tf.constant(enc_pramas['eb1'])
+    #e_w_2 = tf.constant(enc_pramas['ew2'])
+    #e_b_2 = tf.constant(enc_pramas['eb2'])
+    #e_w_3 = tf.constant(enc_pramas['ew3'])
+    #e_b_3 = tf.constant(enc_pramas['eb3'])
 
-    layer1 = tf.tanh(tf.add(tf.matmul(X,e_w_1),e_b_1))
-    layer2 = tf.tanh(tf.add(tf.matmul(layer1,e_w_2),e_b_2))
-    encoded = tf.tanh(tf.add(tf.matmul(layer2,e_w_3),e_b_3))
+    #layer1 = tf.tanh(tf.add(tf.matmul(X,e_w_1),e_b_1))
+    #layer2 = tf.tanh(tf.add(tf.matmul(layer1,e_w_2),e_b_2))
+    #encoded = tf.tanh(tf.add(tf.matmul(layer2,e_w_3),e_b_3))
+    encoded = layer
 
     # now the encoded as input vector.
     w1 = tf.Variable(tf.truncated_normal([64,128],stddev=0.1))
@@ -164,7 +279,6 @@ def dnn_with_enc(enc_pramas,X,n_output):
     layer4 = tf.tanh(tf.add(tf.matmul(layer3,w2),b2))
     output = tf.tanh(tf.add(tf.matmul(layer4,w3),b3))
     return output
-
 
 
 def nn_deprecated(X,output):
