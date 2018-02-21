@@ -1,8 +1,11 @@
 #coding: utf-8
 
 import collections
-_P_FILES = "../data/poetry_utf8.txt"
+#_P_FILES = "../data/poetry_utf8.txt"
+_P_FILES = "../data/poetry.txt"
 import codecs
+
+top_words_len = 1000
 
 def poem_reader():
     poetrys = []
@@ -24,6 +27,7 @@ def poem_reader():
                 #poetrys.append(content)
             except Exception as e:
                 pass
+    poetrys = sorted(poetrys,key=lambda l:len(l))
     return poetrys
 
 
@@ -36,8 +40,13 @@ def poem_preprocess():
     counter_pairs = sorted(counter.items(),key=lambda x:-x[-1])
     words,_ = zip(*counter_pairs)
 
-    for w in words[:100]:
-        print(w)
+    words = words[:top_words_len] + (' ',)
+    word_num_map = dict(zip(words,range(len(words))))
+    to_num = lambda w: word_num_map.get(w,len(words))
+    poetrys_vec = [list(map(to_num,p)) for p in poems]
+
+    batch_size = 64
+    n_chunk = len(poetrys_vec)
 
 
 
