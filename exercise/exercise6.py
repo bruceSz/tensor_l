@@ -78,7 +78,7 @@ def load_train_test():
     return train_x,train_y,test_x,test_y
 
 
-def tied_weight_enc_dnn():
+def enc_dnn(name):
     print("Enter train tied weight enc")
     train_x,train_y,test_x,test_y = load_train_test()
     n_output = train_y.shape[1]
@@ -97,7 +97,7 @@ def tied_weight_enc_dnn():
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         for k,v in enc_params.items():
-            if k == 'ew1':
+            if k == 'ew3':
                 print("Before train para :", k,sess.run(v))
         for epoch in range(training_epochs):
             epoch_costs = np.empty(0)
@@ -109,7 +109,7 @@ def tied_weight_enc_dnn():
         print("Epoch ",epoch,'  Cost: ',np.mean(epoch_costs))
 
         for k,v in enc_params.items():
-            if k == 'ew1':
+            if k == 'ew3':
                 print("After train para :", k,sess.run(v))
             enc_params_vals[k] = sess.run(v)
 
@@ -259,7 +259,7 @@ def train_enc_dec_dnn_deprecated():
 
 
 def main():
-    tied_weight_enc_dnn()
+    enc_dnn('tied_weight')
     #train_enc_dec_dnn()
 
 
