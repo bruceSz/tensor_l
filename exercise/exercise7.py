@@ -1,10 +1,13 @@
 #coding: utf-8
 
 import collections
-_P_FILES = "../data/poetry_utf8.txt"
+#_P_FILES = "../data/poetry_utf8.txt"
+_P_FILES = "../data/poetry.txt"
 import codecs
 import numpy as np
 import tensorflow as tf
+
+top_words_len = 1000
 
 def poem_reader():
     poetrys = []
@@ -26,6 +29,7 @@ def poem_reader():
                 poetrys.append(content)
             except Exception as e:
                 pass
+    poetrys = sorted(poetrys,key=lambda l:len(l))
     return poetrys
 
 
@@ -112,6 +116,7 @@ class PoetryNet(object):
         #,probs,cell,initial_state
 
 
+#<<<<<<< HEAD
     def train_neural_network(self):
         logits,last_state = self.logits,self.last_state
         batch_size = 64
@@ -131,6 +136,16 @@ class PoetryNet(object):
         train_op = opti.apply_gradients(zip(grads,tvars))
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
+#=======
+#    words = words[:top_words_len] + (' ',)
+#    word_num_map = dict(zip(words,range(len(words))))
+#    to_num = lambda w: word_num_map.get(w,len(words))
+#    poetrys_vec = [list(map(to_num,p)) for p in poems]#
+#
+#
+#    batch_size = 64
+#    n_chunk = len(poetrys_vec)
+#>>>>>>> f8f4e226908f6ba3825bac49d253dc388a5a7ec6
 
             saver = tf.train.Saver(tf.all_variables())
             for epoch in range(50):
